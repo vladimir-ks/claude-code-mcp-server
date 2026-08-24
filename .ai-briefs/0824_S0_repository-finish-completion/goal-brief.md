@@ -40,9 +40,9 @@ OUT:
 ## Blocked = Concluded
 Every criterion resolves PROVEN, FILED-BLOCKER or VOID. Before any blocker is accepted, invoke the same-name `resolving-blockers` skill, run its complete ladder, continue independent work and recheck. FILED-BLOCKER requires the pasted failure, named unavoidable external dependency, exact clearing action and three consecutive goal turns with unchanged fresh evidence. Difficulty, budget and disk pressure alone are not blockers.
 
-### BLOCKER — placement-authority
+### SUPERSEDED BLOCKER — placement-authority
 
-- Status: FILED-BLOCKER candidate; first fresh goal-turn observation on 2026-08-24.
+- Status: VOID on 2026-08-24; superseded by governing PDAA repository evidence lines 1647–1658.
 - Recheck 2: unchanged on the next automatic goal continuation; exact authority search again returned no mapping, candidate target remained absent, and terminal refs/recovery remained exact. One further fresh goal turn is required by the blocked audit threshold.
 - Recheck 3: unchanged on the third consecutive goal turn; exact authority search again returned no mapping, candidate target remained absent, and terminal refs/recovery remained exact. The repeated-blocker threshold is satisfied; placement is now FILED-BLOCKER with the clearing action below.
 - Failure: exact `rg` over `_pdaa/workspace.yaml`, the campaign goal/payload/relocation authority and the decisions ledger returned no `claude-code-mcp-server` placement mapping; the proposed `_dev_tools` target is absent but absence is not authorization.
@@ -50,6 +50,8 @@ Every criterion resolves PROVEN, FILED-BLOCKER or VOID. Before any blocker is ac
 - External dependency: fleet coordinator placement decision.
 - Exact clearing action: record the approved steward and exact collision-free operating-group destination for repository identity `vladimir-ks/claude-code-mcp-server`, then rerun the state-bound relocation rehearsal.
 - Independent repository quality, consumer accounting, preservation and cleanup continue; do not move on inference.
+
+Superseding authority classifies this repository as `external-reference`, install model `source-only`, and desired contract `/Users/vmks/_external/claude-code-mcp-server`, with required G0–G5 and G5 rollback. Relocation is therefore admitted only through the state-bound v3 apply/verify/rollback/reapply procedure.
 
 ## Scope Verdict
 Tier L · approximately 25–45 turns · repository code/tests/docs plus bounded consumer and relocation artifacts. Verdict: oversized-single-goal; all remaining repository completion surfaces stay in one lineage.

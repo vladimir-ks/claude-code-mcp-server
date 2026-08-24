@@ -1,11 +1,11 @@
 {
   "schema": "claude-code-mcp-relocation-rehearsal-v1",
   "stamp": "2026-08-24",
-  "status": "RED_AUTHORITY_REQUIRED",
+  "status": "AUTHORITY_GREEN_G4_REFRESH_REQUIRED",
   "source": "/Users/vmks/_IT_Projects/40_repos_cloned/claude-code-mcp-server",
-  "proposed_target": "/Users/vmks/_IT_Projects/_dev_tools/claude-code-mcp-server",
-  "proposed_steward": "vladimir-ks",
-  "placement_authority": null,
+  "proposed_target": "/Users/vmks/_external/claude-code-mcp-server",
+  "proposed_steward": "external-reference",
+  "placement_authority": "/Users/vmks/_pdaa/_refs/workspace-convergence/repository-evidence.yaml:1647-1658",
   "prepared_against_head": "e9bf1856ad2e6de57c0747bc775c6f2ea47d615e",
   "prepared_against_tree": "20431324df3268a21c966f8402212827a7a57500",
   "origin_main": "e9bf1856ad2e6de57c0747bc775c6f2ea47d615e",
@@ -32,6 +32,6 @@
     "verify HEAD, tree, tracked manifest and local-state hashes",
     "restore any typed consumer rewrites from the recorded before-values"
   ],
-  "execution_authorized": false,
-  "clearing_action": "Fleet coordinator records an exact approved operating-group destination and steward for this repository identity."
+  "execution_authorized": true,
+  "clearing_action": "Refresh G4 against the final pushed HEAD, then execute the state-bound v3 plan with compatibility-alias, rollback, and reapply proof."
 }

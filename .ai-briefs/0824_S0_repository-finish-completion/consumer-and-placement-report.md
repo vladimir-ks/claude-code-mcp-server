@@ -15,11 +15,11 @@ Stamp: 2026-08-24
 ## Steward and destination
 
 - Product authority: upstream `steipete/claude-code-mcp` plus maintained fork `vladimir-ks/claude-code-mcp-server`.
-- Proposed primary steward: `vladimir-ks`, supported by the configured origin and authored fork commit. This is identity/steward evidence, not move authority.
-- Proposed semantic destination: `/Users/vmks/_IT_Projects/_dev_tools/claude-code-mcp-server`.
-- Destination authority: absent. `_pdaa/workspace.yaml`, the fleet goal/decisions and exact campaign evidence contain no approved mapping for this identity; filesystem ancestry and sibling precedent cannot authorize a move.
+- Primary steward/class: `external-reference`, per PDAA repository evidence lines 1647–1658; fork maintenance remains attributable to `vladimir-ks` through the configured origin.
+- Approved destination: `/Users/vmks/_external/claude-code-mcp-server`.
+- Destination authority: `/Users/vmks/_pdaa/_refs/workspace-convergence/repository-evidence.yaml:1647`–`:1658`, which records `external-reference`, the exact desired contract, `source-only`, G0–G5, and the G5 rollback contract.
 - Target collision: absent at rehearsal time. Source and target parent are on device `16777234`.
 
-## Clearing condition
+## Cutover condition
 
-The fleet coordinator must record the exact approved destination/steward. Only then may relocation v3 refresh this report and plan, preserve local markers, create the compatibility alias, prove source-hidden behavior and run rollback/forward byte-identity checks.
+Relocation v3 must bind the certified pushed HEAD, preserve local markers, retain the four governing historical-source records behind the compatibility alias, prove target operation with the legacy path hidden, and execute rollback/reapply with exact identity and persistence parity.
