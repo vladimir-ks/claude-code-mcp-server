@@ -11,7 +11,7 @@ This document describes the release process for claude-code-mcp to ensure qualit
    ```
    This will:
    - Build the project
-   - Run all tests
+   - Run the bounded unit tests
    - Set up local testing in Claude
 
 2. **Test in Claude**
@@ -36,8 +36,8 @@ Once local testing is complete:
 
 This will:
 1. Ensure you're on main branch
-2. Run tests
-3. Build the project
+2. Run build, unit and isolated mock e2e tests
+3. Verify the package allowlist and production dependency audit
 4. Bump version (patch/minor/major)
 5. Update changelog
 6. Create git tag

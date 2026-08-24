@@ -3,9 +3,11 @@
 ## Pre-Release Checks
 
 - [ ] Tests are green on GitHub CI
-- [ ] Run linter locally (`npm run lint`)
 - [ ] Run type checker locally (`npm run typecheck`)
 - [ ] Run tests locally (`npm test`)
+- [ ] Run isolated mock e2e locally (`npm run test:e2e`)
+- [ ] Verify the publish allowlist (`npm run test:package`)
+- [ ] Verify production dependencies (`npm audit --omit=dev --audit-level=high`)
 - [ ] Run build locally (`npm run build`)
 - [ ] Changelog version has been increased
 - [ ] Changelog entries for the new version are written
@@ -23,4 +25,4 @@
 - [ ] Create a git tag for the version (e.g., `git tag v1.2.3`)
 - [ ] Push the git tag (e.g., `git push origin v1.2.3`)
 - [ ] Publish to npm (`npm publish`)
-- [ ] Create a GitHub Release based on the tag, including changelog notes 
+- [ ] Create a GitHub Release based on the tag, including changelog notes

@@ -16,8 +16,9 @@ if [ "$CURRENT_BRANCH" != "main" ]; then
     exit 1
 fi
 
-# Ensure working directory is clean
-if [ -n "$(git status --porcelain)" ]; then
+# Ensure tracked state is clean. The repository's required Spotlight marker is accepted local state.
+DIRTY_STATE=$(git status --porcelain --untracked-files=all | grep -v '^?? \.metadata_never_index$' || true)
+if [ -n "$DIRTY_STATE" ]; then
     echo "❌ Error: Working directory is not clean"
     echo "   Please commit or stash your changes"
     exit 1
@@ -25,15 +26,14 @@ fi
 
 # Pull latest changes
 echo "📥 Pulling latest changes..."
-git pull
+git pull --ff-only
 
-# Run tests
-echo "🧪 Running tests..."
+# Run bounded release certification. E2E uses the generated mock; real-Claude cases stay skipped.
+echo "🧪 Running release certification..."
 npm test
-
-# Build the project
-echo "📦 Building project..."
-npm run build
+npm run test:e2e
+npm run test:package
+npm audit --omit=dev --audit-level=high
 
 # Get current version
 CURRENT_VERSION=$(node -p "require('./package.json').version")

@@ -43,6 +43,7 @@ Every criterion resolves PROVEN, FILED-BLOCKER or VOID. Before any blocker is ac
 ### BLOCKER — placement-authority
 
 - Status: FILED-BLOCKER candidate; first fresh goal-turn observation on 2026-08-24.
+- Recheck 2: unchanged on the next automatic goal continuation; exact authority search again returned no mapping, candidate target remained absent, and terminal refs/recovery remained exact. One further fresh goal turn is required by the blocked audit threshold.
 - Failure: exact `rg` over `_pdaa/workspace.yaml`, the campaign goal/payload/relocation authority and the decisions ledger returned no `claude-code-mcp-server` placement mapping; the proposed `_dev_tools` target is absent but absence is not authorization.
 - Ladder: ground truth, troubleshooting KB, credential relevance, mint/self-hosted paths, standing grants and available interaction surfaces were checked in order. No source can create an authoritative fleet decision inside this repository task.
 - External dependency: fleet coordinator placement decision.
