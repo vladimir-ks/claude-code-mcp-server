@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+- Added optional `sessionId`, `messages`, and `stateless` arguments so MCP clients can resume Claude Code sessions while preserving legacy one-shot calls by default. Thanks @marcusquinn.
+- Added optional `permissionMode` so callers can opt out of bypassed permissions and use Claude Code's native permission modes. Thanks @mikestaub.
+- Increased the default Claude CLI execution timeout to 60 minutes and added `CLAUDE_CLI_TIMEOUT_SECONDS` for local overrides.
+- Documented the permission boundary of this MCP wrapper and current native Claude Code alternatives for permission-sensitive workflows.
+
 ## [1.10.12] - 2025-05-17
 
 - Fixed MCP server startup issue by ensuring process runs regardless of module detection

@@ -5,7 +5,7 @@
 [![npm package](https://img.shields.io/npm/v/@steipete/claude-code-mcp)](https://www.npmjs.com/package/@steipete/claude-code-mcp)
 [![View changelog](https://img.shields.io/badge/Explore%20Changelog-brightgreen)](/CHANGELOG.md)
 
-An MCP (Model Context Protocol) server that allows running Claude Code in one-shot mode with permissions bypassed automatically.
+An MCP (Model Context Protocol) server that allows running Claude Code in one-shot mode, with bypassed permissions by default and optional native Claude Code permission modes.
 
 Did you notice that Cursor sometimes struggles with complex, multi-step edits or operations? This server, with its powerful unified `claude_code` tool, aims to make Claude a more direct and capable agent for your coding tasks.
 
@@ -15,14 +15,27 @@ Did you notice that Cursor sometimes struggles with complex, multi-step edits or
 
 This MCP server provides one tool that can be used by LLMs to interact with Claude Code. When integrated with Claude Desktop or other MCP clients, it allows LLMs to:
 
-- Run Claude Code with all permissions bypassed (using `--dangerously-skip-permissions`)
-- Execute Claude Code with any prompt without permission interruptions
+- Run Claude Code with all permissions bypassed by default (using `--dangerously-skip-permissions`)
+- Execute Claude Code with a native permission mode when requested
 - Access file editing capabilities directly
 - Enable specific tools by default
 
+## Permissions and Alternatives
+
+This server is a thin MCP wrapper around the local Claude Code CLI. By default it preserves the historic behavior and starts Claude Code with `--dangerously-skip-permissions`. Set the tool's `permissionMode` argument to `default`, `acceptEdits`, `auto`, `dontAsk`, or `plan` when you want Claude Code's native permission checks instead. This wrapper is not an OS-level sandbox; for a hard file-system boundary, run the MCP server or Claude CLI inside your own container, VM, or platform sandbox.
+
+The wrapper cannot approve prompts that belong to a parent MCP client, bypass macOS privacy prompts, or make another Claude Code session inherit its settings. If the calling client stalls while waiting for permission checks, fix the caller's MCP permissions or run Claude Code directly instead.
+
+Current alternatives:
+- Use Claude Code directly for work that needs its native permission UI: `claude`, `claude -p`, or `claude --permission-mode default`.
+- Use Claude Code's native MCP server when another MCP client should access Claude Code tools: `claude mcp serve`.
+- For Claude Code as the caller, configure tool permissions with `--allowedTools`, `--disallowedTools`, project/user settings, or `--permission-prompt-tool`.
+
+Use this package when you specifically want one MCP tool that delegates a prompt to a separate Claude Code process. Prefer native Claude Code MCP/permission configuration when permission ownership needs to stay with the active Claude Code session.
+
 ## Benefits
 
-- Claude/Windsurf often have trouble editing files. Claude Code is better and faster at it.
+- Cursor/Windsurf often have trouble editing files. Claude Code is better and faster at it.
 - Multiple commands can be queued instead of direct execution. This saves context space so more important stuff is retained longer, fewer compacts happen.
 - File ops, git, or other operations don't need costy models. Claude Code is pretty cost effective if you sign up for Antropic Max. You can use Gemini or o3 in Max mode and save costs with offloading tasks to cheaper models.
 - Claude has wider system access and can do things that Cursor/Windsurf can't do (or believe they can't), so whenever they are stuck just ask them "use claude code" and it will usually un-stuck them.
@@ -33,7 +46,7 @@ This MCP server provides one tool that can be used by LLMs to interact with Clau
 ## Prerequisites
 
 - Node.js v20 or later (Use fnm or nvm to install)
-- Claude CLI installed locally (run it and call /doctor) and `-dangerously-skip-permissions` accepted.
+- Claude CLI installed locally (run it and call /doctor). For the default mode, accept `--dangerously-skip-permissions` once.
 
 ## Configuration
 
@@ -56,6 +69,7 @@ This MCP server provides one tool that can be used by LLMs to interact with Clau
   Note: The local user installation path (`~/.claude/local/claude`) will still be checked but only for the default `claude` binary.
 
 - `MCP_CLAUDE_DEBUG`: Enable debug logging (set to `true` for verbose output)
+- `CLAUDE_CLI_TIMEOUT_SECONDS`: Override the Claude CLI execution timeout in seconds (default: `3600`)
 
 ## Installation & Usage
 
@@ -88,7 +102,7 @@ To use a custom Claude CLI binary name, you can specify the environment variable
 
 ## Important First-Time Setup: Accepting Permissions
 
-**Before the MCP server can successfully use the `claude_code` tool, you must first run the Claude CLI manually once with the `--dangerously-skip-permissions` flag, login and accept the terms.**
+**Before the MCP server can use the default `bypassPermissions` mode, you must first run the Claude CLI manually once with the `--dangerously-skip-permissions` flag, login and accept the terms.**
 
 This is a one-time requirement by the Claude CLI.
 
@@ -135,12 +149,15 @@ This server exposes one primary tool:
 
 ### `claude_code`
 
-Executes a prompt directly using the Claude Code CLI with `--dangerously-skip-permissions`.
+Executes a prompt directly using the Claude Code CLI. Defaults to bypassed permissions for backwards compatibility; pass `permissionMode` to use Claude Code's native permission modes.
 
 **Arguments:**
 - `prompt` (string, required): The prompt to send to Claude Code.
-- `options` (object, optional):
-  - `tools` (array of strings, optional): Specific Claude tools to enable (e.g., `Bash`, `Read`, `Write`). Common tools are enabled by default.
+- `workFolder` (string, optional): Absolute working directory for file operations.
+- `sessionId` (string, optional): Parent session ID. Repeated calls with the same ID resume the same Claude Code session.
+- `messages` (array, optional): Conversation history to inject on the first call for a session.
+- `stateless` (boolean, optional): Disable session continuity for this call.
+- `permissionMode` (string, optional): Claude Code permission mode. Defaults to `bypassPermissions` for backwards compatibility; use `default`, `acceptEdits`, `auto`, `dontAsk`, or `plan` to avoid bypassing permission checks.
 
 **Example MCP Request:**
 ```json
@@ -227,7 +244,7 @@ This example illustrates `claude_code` handling a more complex, multi-step task,
 
 - **"Command not found" (claude-code-mcp):** If installed globally, ensure the npm global bin directory is in your system's PATH. If using `npx`, ensure `npx` itself is working.
 - **"Command not found" (claude or ~/.claude/local/claude):** Ensure the Claude CLI is installed correctly. Run `claude/doctor` or check its documentation.
-- **Permissions Issues:** Make sure you've run the "Important First-Time Setup" step.
+- **Permissions Issues:** Make sure you've run the "Important First-Time Setup" step. If the parent MCP client is waiting on its own approval flow, configure that client's MCP permissions or use Claude Code's native `claude mcp serve` path; this server can only pass flags to the child Claude Code process it starts.
 - **JSON Errors from Server:** If `MCP_CLAUDE_DEBUG` is `true`, error messages or logs might interfere with MCP's JSON parsing. Set to `false` for normal operation.
 - **ESM/Import Errors:** Ensure you are using Node.js v20 or later.
 

@@ -9,17 +9,18 @@ import {
   type ServerResult,
 } from '@modelcontextprotocol/sdk/types.js';
 import { spawn } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, resolve as pathResolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import * as path from 'path';
-import { readFileSync } from 'node:fs';
 
 // Server version - update this when releasing new versions
 const SERVER_VERSION = "1.10.12";
 
 // Define debugMode globally using const
 const debugMode = process.env.MCP_CLAUDE_DEBUG === 'true';
+const DEFAULT_CLAUDE_CLI_TIMEOUT_SECONDS = 3600;
 
 // Track if this is the first tool use for version printing
 let isFirstToolUse = true;
@@ -34,51 +35,101 @@ export function debugLog(message?: any, ...optionalParams: any[]): void {
   }
 }
 
+export function resolveClaudeCliTimeoutMs(envValue = process.env.CLAUDE_CLI_TIMEOUT_SECONDS): number {
+  const raw = envValue?.trim();
+  if (!raw) {
+    return DEFAULT_CLAUDE_CLI_TIMEOUT_SECONDS * 1000;
+  }
+
+  if (!/^\d+$/.test(raw)) {
+    debugLog(`[Warning] Invalid CLAUDE_CLI_TIMEOUT_SECONDS value "${raw}". Using default.`);
+    return DEFAULT_CLAUDE_CLI_TIMEOUT_SECONDS * 1000;
+  }
+
+  const seconds = Number(raw);
+  if (!Number.isSafeInteger(seconds) || seconds <= 0) {
+    debugLog(`[Warning] Invalid CLAUDE_CLI_TIMEOUT_SECONDS value "${raw}". Using default.`);
+    return DEFAULT_CLAUDE_CLI_TIMEOUT_SECONDS * 1000;
+  }
+
+  return seconds * 1000;
+}
+
 /**
  * Determine the Claude CLI command/path.
- * 1. Checks for CLAUDE_CLI_NAME environment variable:
- *    - If absolute path, uses it directly
- *    - If relative path, throws error
- *    - If simple name, continues with path resolution
- * 2. Checks for Claude CLI at the local user path: ~/.claude/local/claude.
- * 3. If not found, defaults to the CLI name (or 'claude'), relying on the system's PATH for lookup.
+ * 1. Checks CLAUDE_CLI_PATH env var (absolute path to the CLI binary).
+ * 2. Checks CLAUDE_CLI_NAME env var (custom binary name or absolute path).
+ * 3. Checks local user path: ~/.claude/local/claude (+ .cmd/.exe on Windows).
+ * 4. Falls back to the CLI name (or 'claude'), relying on the system's PATH.
  */
 export function findClaudeCli(): string {
   debugLog('[Debug] Attempting to find Claude CLI...');
+  const isWindows = process.platform === 'win32';
 
-  // Check for custom CLI name from environment variable
+  // 1. Check CLAUDE_CLI_PATH first (explicit absolute path to the binary)
+  const cliPath = process.env.CLAUDE_CLI_PATH;
+  if (cliPath) {
+    debugLog(`[Debug] CLAUDE_CLI_PATH is set: ${cliPath}`);
+    if (existsSync(cliPath)) {
+      debugLog(`[Debug] Found Claude CLI at CLAUDE_CLI_PATH: ${cliPath}`);
+      return cliPath;
+    }
+    console.warn(`[Warning] CLAUDE_CLI_PATH is set to "${cliPath}" but file does not exist. Continuing with other methods.`);
+  }
+
+  // 2. Check for custom CLI name from environment variable
   const customCliName = process.env.CLAUDE_CLI_NAME;
   if (customCliName) {
     debugLog(`[Debug] Using custom Claude CLI name from CLAUDE_CLI_NAME: ${customCliName}`);
-    
+
     // If it's an absolute path, use it directly
     if (path.isAbsolute(customCliName)) {
       debugLog(`[Debug] CLAUDE_CLI_NAME is an absolute path: ${customCliName}`);
       return customCliName;
     }
-    
+
     // If it starts with ~ or ./, reject as relative paths are not allowed
     if (customCliName.startsWith('./') || customCliName.startsWith('../') || customCliName.includes('/')) {
       throw new Error(`Invalid CLAUDE_CLI_NAME: Relative paths are not allowed. Use either a simple name (e.g., 'claude') or an absolute path (e.g., '/tmp/claude-test')`);
     }
   }
-  
+
   const cliName = customCliName || 'claude';
 
-  // Try local install path: ~/.claude/local/claude (using the original name for local installs)
+  // 3. Try local install path: ~/.claude/local/claude
+  //    On Windows, also check .cmd and .exe extensions since npm installs create .cmd wrappers
   const userPath = join(homedir(), '.claude', 'local', 'claude');
-  debugLog(`[Debug] Checking for Claude CLI at local user path: ${userPath}`);
+  const candidatePaths = isWindows
+    ? [userPath, `${userPath}.cmd`, `${userPath}.exe`]
+    : [userPath];
 
-  if (existsSync(userPath)) {
-    debugLog(`[Debug] Found Claude CLI at local user path: ${userPath}. Using this path.`);
-    return userPath;
-  } else {
-    debugLog(`[Debug] Claude CLI not found at local user path: ${userPath}.`);
+  for (const candidate of candidatePaths) {
+    debugLog(`[Debug] Checking for Claude CLI at: ${candidate}`);
+    if (existsSync(candidate)) {
+      debugLog(`[Debug] Found Claude CLI at: ${candidate}`);
+      return candidate;
+    }
+  }
+  debugLog(`[Debug] Claude CLI not found at local user path: ${userPath}`);
+
+  // 4. On Windows, also check common npm global install locations
+  if (isWindows) {
+    const npmGlobalPaths = [
+      join(homedir(), 'AppData', 'Roaming', 'npm', 'claude.cmd'),
+      join(homedir(), 'AppData', 'Roaming', 'npm', 'claude.exe'),
+    ];
+    for (const npmPath of npmGlobalPaths) {
+      debugLog(`[Debug] Checking Windows npm global path: ${npmPath}`);
+      if (existsSync(npmPath)) {
+        debugLog(`[Debug] Found Claude CLI at npm global path: ${npmPath}`);
+        return npmPath;
+      }
+    }
   }
 
-  // 3. Fallback to CLI name (PATH lookup)
+  // 5. Fallback to CLI name (PATH lookup)
   debugLog(`[Debug] Falling back to "${cliName}" command name, relying on spawn/PATH lookup.`);
-  console.warn(`[Warning] Claude CLI not found at ~/.claude/local/claude. Falling back to "${cliName}" in PATH. Ensure it is installed and accessible.`);
+  console.warn(`[Warning] Claude CLI not found at local paths. Falling back to "${cliName}" in PATH. Ensure it is installed and accessible.`);
   return cliName;
 }
 
@@ -88,14 +139,151 @@ export function findClaudeCli(): string {
 interface ClaudeCodeArgs {
   prompt: string;
   workFolder?: string;
+  sessionId?: string;
+  messages?: ConversationMessage[];
+  stateless?: boolean;
+  permissionMode?: ClaudePermissionMode;
+}
+
+interface ConversationMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+const CLAUDE_PERMISSION_MODES = ['acceptEdits', 'auto', 'bypassPermissions', 'default', 'dontAsk', 'plan'] as const;
+type ClaudePermissionMode = (typeof CLAUDE_PERMISSION_MODES)[number];
+
+function isClaudePermissionMode(value: unknown): value is ClaudePermissionMode {
+  return typeof value === 'string' && (CLAUDE_PERMISSION_MODES as readonly string[]).includes(value);
+}
+
+interface ClaudeCliResponse {
+  type: string;
+  result?: string;
+  session_id?: string;
+}
+
+interface SessionEntry {
+  claudeSessionId: string;
+  updatedAt: string;
+}
+
+const MAX_SESSIONS = 1000;
+const SESSION_TTL_MS = 24 * 60 * 60 * 1000;
+const SESSION_FILE =
+  process.env.CLAUDE_CODE_MCP_SESSION_FILE ||
+  join(homedir(), '.config', 'claude-code-mcp', 'sessions.json');
+let sessionMap: Map<string, SessionEntry> | null = null;
+
+function ensureSessionMap(): Map<string, SessionEntry> {
+  if (sessionMap) return sessionMap;
+  sessionMap = new Map();
+  try {
+    if (existsSync(SESSION_FILE)) {
+      const parsed = JSON.parse(readFileSync(SESSION_FILE, 'utf8')) as Record<string, SessionEntry>;
+      sessionMap = new Map(Object.entries(parsed));
+      cleanExpiredSessions();
+    }
+  } catch (error) {
+    debugLog('[Debug] Failed to load Claude session map:', error);
+    sessionMap = new Map();
+  }
+  return sessionMap;
+}
+
+function saveSessionMap(): void {
+  const map = ensureSessionMap();
+  try {
+    mkdirSync(path.dirname(SESSION_FILE), { recursive: true });
+    writeFileSync(SESSION_FILE, JSON.stringify(Object.fromEntries(map), null, 2), {
+      mode: 0o600,
+    });
+  } catch (error) {
+    debugLog('[Debug] Failed to save Claude session map:', error);
+  }
+}
+
+function cleanExpiredSessions(): void {
+  const map = ensureSessionMap();
+  const now = Date.now();
+  let changed = false;
+  for (const [key, entry] of map) {
+    if (now - new Date(entry.updatedAt).getTime() > SESSION_TTL_MS) {
+      map.delete(key);
+      changed = true;
+    }
+  }
+  if (changed) saveSessionMap();
+}
+
+function getSessionMapping(parentSessionId: string): string | undefined {
+  const map = ensureSessionMap();
+  const entry = map.get(parentSessionId);
+  if (!entry) return undefined;
+  if (Date.now() - new Date(entry.updatedAt).getTime() > SESSION_TTL_MS) {
+    map.delete(parentSessionId);
+    saveSessionMap();
+    return undefined;
+  }
+  return entry.claudeSessionId;
+}
+
+function setSessionMapping(parentSessionId: string, claudeSessionId: string): void {
+  const map = ensureSessionMap();
+  if (map.size >= MAX_SESSIONS) {
+    const oldestKey = map.keys().next().value;
+    if (oldestKey) map.delete(oldestKey);
+  }
+  map.set(parentSessionId, {
+    claudeSessionId,
+    updatedAt: new Date().toISOString(),
+  });
+  saveSessionMap();
+}
+
+function formatConversationContext(messages: ConversationMessage[]): string {
+  if (messages.length === 0) return '';
+  const formatted = messages
+    .map((message) => {
+      const role = message.role === 'assistant' ? 'Assistant' : 'User';
+      return `[${role}]: ${message.content}`;
+    })
+    .join('\n\n');
+  return `<conversation_context>\n${formatted}\n</conversation_context>\n\n`;
+}
+
+function translateSlashCommands(prompt: string): string {
+  return prompt.replace(/^\/([a-zA-Z][a-zA-Z0-9_-]*)(?=\s|$)/gm, '@$1');
+}
+
+function parseClaudeResponse(stdout: string): ClaudeCliResponse | null {
+  const trimmed = stdout.trim();
+  const candidates = trimmed.startsWith('{') && trimmed.endsWith('}')
+    ? [trimmed]
+    : trimmed.split('\n').map((line) => line.trim()).filter((line) => line.startsWith('{') && line.endsWith('}')).reverse();
+
+  for (const candidate of candidates) {
+    try {
+      const parsed = JSON.parse(candidate) as ClaudeCliResponse;
+      if (parsed.type === 'result') return parsed;
+    } catch {
+      // Try the next JSON-looking line.
+    }
+  }
+  return null;
 }
 
 // Ensure spawnAsync is defined correctly *before* the class
 export async function spawnAsync(command: string, args: string[], options?: { timeout?: number, cwd?: string }): Promise<{ stdout: string; stderr: string }> {
   return new Promise((resolve, reject) => {
     debugLog(`[Spawn] Running command: ${command} ${args.join(' ')}`);
-    const process = spawn(command, args, {
-      shell: false, // Reverted to false
+
+    // On Windows, .cmd/.bat files need shell: true to execute properly
+    const needsShell = process.platform === 'win32' &&
+      (command.toLowerCase().endsWith('.cmd') || command.toLowerCase().endsWith('.bat'));
+
+    const childProcess = spawn(command, args, {
+      shell: needsShell,
       timeout: options?.timeout,
       cwd: options?.cwd,
       stdio: ['ignore', 'pipe', 'pipe']
@@ -104,13 +292,13 @@ export async function spawnAsync(command: string, args: string[], options?: { ti
     let stdout = '';
     let stderr = '';
 
-    process.stdout.on('data', (data) => { stdout += data.toString(); });
-    process.stderr.on('data', (data) => {
+    childProcess.stdout.on('data', (data) => { stdout += data.toString(); });
+    childProcess.stderr.on('data', (data) => {
       stderr += data.toString();
       debugLog(`[Spawn Stderr Chunk] ${data.toString()}`);
     });
 
-    process.on('error', (error: NodeJS.ErrnoException) => {
+    childProcess.on('error', (error: NodeJS.ErrnoException) => {
       debugLog(`[Spawn Error Event] Full error object:`, error);
       let errorMessage = `Spawn error: ${error.message}`;
       if (error.path) {
@@ -123,7 +311,7 @@ export async function spawnAsync(command: string, args: string[], options?: { ti
       reject(new Error(errorMessage));
     });
 
-    process.on('close', (code) => {
+    childProcess.on('close', (code) => {
       debugLog(`[Spawn Close] Exit code: ${code}`);
       debugLog(`[Spawn Stderr Full] ${stderr.trim()}`);
       debugLog(`[Spawn Stdout Full] ${stdout.trim()}`);
@@ -226,6 +414,38 @@ export class ClaudeCodeServer {
                 type: 'string',
                 description: 'Mandatory when using file operations or referencing any file. The working directory for the Claude CLI execution. Must be an absolute path.',
               },
+              sessionId: {
+                type: 'string',
+                description: 'Parent session ID. When provided, repeated calls resume the same Claude Code session.',
+              },
+              messages: {
+                type: 'array',
+                description: 'Conversation history to inject on the first call for a session.',
+                items: {
+                  type: 'object',
+                  properties: {
+                    role: {
+                      type: 'string',
+                      enum: ['user', 'assistant'],
+                    },
+                    content: {
+                      type: 'string',
+                    },
+                  },
+                  required: ['role', 'content'],
+                },
+              },
+              stateless: {
+                type: 'boolean',
+                description: 'Disable session continuity for this call.',
+                default: false,
+              },
+              permissionMode: {
+                type: 'string',
+                enum: [...CLAUDE_PERMISSION_MODES],
+                description: 'Claude Code permission mode. Defaults to bypassPermissions for backwards compatibility; use default, acceptEdits, auto, dontAsk, or plan to avoid bypassing permission checks.',
+                default: 'bypassPermissions',
+              },
             },
             required: ['prompt'],
           },
@@ -234,7 +454,7 @@ export class ClaudeCodeServer {
     }));
 
     // Handle tool calls
-    const executionTimeoutMs = 1800000; // 30 minutes timeout
+    const executionTimeoutMs = resolveClaudeCliTimeoutMs();
 
     this.server.setRequestHandler(CallToolRequestSchema, async (args, call): Promise<ServerResult> => {
       debugLog('[Debug] Handling CallToolRequest:', args);
@@ -259,6 +479,38 @@ export class ClaudeCodeServer {
         prompt = toolArguments.prompt;
       } else {
         throw new McpError(ErrorCode.InvalidParams, 'Missing or invalid required parameter: prompt (must be an object with a string "prompt" property) for claude_code tool');
+      }
+
+      const sessionId = toolArguments.sessionId;
+      if (sessionId !== undefined && typeof sessionId !== 'string') {
+        throw new McpError(ErrorCode.InvalidParams, 'Invalid parameter: sessionId must be a string.');
+      }
+
+      const messages = toolArguments.messages;
+      if (messages !== undefined) {
+        if (!Array.isArray(messages)) {
+          throw new McpError(ErrorCode.InvalidParams, 'Invalid parameter: messages must be an array.');
+        }
+        for (const message of messages) {
+          if (
+            typeof message !== 'object' ||
+            message === null ||
+            (message.role !== 'user' && message.role !== 'assistant') ||
+            typeof message.content !== 'string'
+          ) {
+            throw new McpError(ErrorCode.InvalidParams, 'Invalid parameter: each message must include role and content strings.');
+          }
+        }
+      }
+
+      const stateless = toolArguments.stateless === true;
+      const permissionMode =
+        toolArguments.permissionMode === undefined ? 'bypassPermissions' : toolArguments.permissionMode;
+      if (!isClaudePermissionMode(permissionMode)) {
+        throw new McpError(
+          ErrorCode.InvalidParams,
+          `Invalid parameter: permissionMode must be one of ${CLAUDE_PERMISSION_MODES.join(', ')}.`
+        );
       }
 
       // Determine the working directory
@@ -290,7 +542,26 @@ export class ClaudeCodeServer {
           isFirstToolUse = false;
         }
 
-        const claudeProcessArgs = ['--dangerously-skip-permissions', '-p', prompt];
+        let processedPrompt = translateSlashCommands(prompt);
+        const claudeProcessArgs =
+          permissionMode === 'bypassPermissions'
+            ? ['--dangerously-skip-permissions']
+            : ['--permission-mode', permissionMode];
+        const useSessionContinuity = !stateless && typeof sessionId === 'string' && sessionId.length > 0;
+
+        if (useSessionContinuity) {
+          const existingClaudeSessionId = getSessionMapping(sessionId);
+          claudeProcessArgs.push('--output-format', 'json');
+          if (existingClaudeSessionId) {
+            claudeProcessArgs.push('--resume', existingClaudeSessionId);
+          } else if (Array.isArray(messages) && messages.length > 0) {
+            processedPrompt = formatConversationContext(messages as ConversationMessage[]) +
+              'Continue the conversation. ' +
+              processedPrompt;
+          }
+        }
+
+        claudeProcessArgs.push('-p', processedPrompt);
         debugLog(`[Debug] Invoking Claude CLI: ${this.claudeCliPath} ${claudeProcessArgs.join(' ')}`);
 
         const { stdout, stderr } = await spawnAsync(
@@ -304,8 +575,27 @@ export class ClaudeCodeServer {
           debugLog('[Debug] Claude CLI stderr:', stderr.trim());
         }
 
-        // Return stdout content, even if there was stderr, as claude-cli might output main result to stdout.
-        return { content: [{ type: 'text', text: stdout }] };
+        if (!useSessionContinuity) {
+          // Return stdout content, even if there was stderr, as claude-cli might output main result to stdout.
+          return { content: [{ type: 'text', text: stdout }] };
+        }
+
+        const parsedResponse = parseClaudeResponse(stdout);
+        if (!parsedResponse) {
+          return { content: [{ type: 'text', text: stdout }] };
+        }
+
+        const resultText = parsedResponse.result ?? '';
+        const claudeSessionId = parsedResponse.session_id;
+        if (claudeSessionId) {
+          setSessionMapping(sessionId, claudeSessionId);
+        }
+
+        const content: { type: 'text'; text: string }[] = [{ type: 'text', text: resultText }];
+        if (claudeSessionId) {
+          content.push({ type: 'text', text: `\n---\n_Session ID: ${claudeSessionId}_` });
+        }
+        return { content };
 
       } catch (error: any) {
         debugLog('[Error] Error executing Claude CLI:', error);
@@ -339,6 +629,14 @@ export class ClaudeCodeServer {
   }
 }
 
-// Create and run the server if this is the main module
-const server = new ClaudeCodeServer();
-server.run().catch(console.error);
+export async function main(): Promise<void> {
+  const server = new ClaudeCodeServer();
+  await server.run();
+}
+
+const isMainModule = process.argv[1] !== undefined
+  && pathResolve(process.argv[1]) === fileURLToPath(import.meta.url);
+
+if (isMainModule) {
+  main().catch(console.error);
+}

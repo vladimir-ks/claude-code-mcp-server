@@ -1,9 +1,9 @@
-import { describe, it, expect, beforeEach, afterEach, afterAll } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync, readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { MCPTestClient } from './utils/mcp-client.js';
-import { getSharedMock, cleanupSharedMock } from './utils/persistent-mock.js';
+import { getSharedMock, getMockCliPath } from './utils/persistent-mock.js';
 
 describe('Claude Code MCP E2E Tests', () => {
   let client: MCPTestClient;
@@ -13,16 +13,16 @@ describe('Claude Code MCP E2E Tests', () => {
   beforeEach(async () => {
     // Ensure mock exists
     await getSharedMock();
-    
+
     // Create a temporary directory for test files
     testDir = mkdtempSync(join(tmpdir(), 'claude-code-test-'));
-    
-    // Initialize MCP client with debug mode and custom binary name using absolute path
+
+    // Initialize MCP client with debug mode and custom binary name using dynamic path
     client = new MCPTestClient(serverPath, {
       MCP_CLAUDE_DEBUG: 'true',
-      CLAUDE_CLI_NAME: '/tmp/claude-code-test-mock/claudeMocked',
+      CLAUDE_CLI_NAME: getMockCliPath(),
     });
-    
+
     await client.connect();
   });
 
@@ -33,11 +33,8 @@ describe('Claude Code MCP E2E Tests', () => {
     // Clean up test directory
     rmSync(testDir, { recursive: true, force: true });
   });
-  
-  afterAll(async () => {
-    // Only cleanup mock at the very end
-    await cleanupSharedMock();
-  });
+  // Note: Mock cleanup is handled by global setup.ts, not here
+  // to avoid race conditions with parallel test files
 
   describe('Tool Registration', () => {
     it('should register claude_code tool', async () => {
@@ -47,9 +44,9 @@ describe('Claude Code MCP E2E Tests', () => {
       expect(tools[0]).toEqual({
         name: 'claude_code',
         description: expect.stringContaining('Claude Code Agent'),
-        inputSchema: {
+        inputSchema: expect.objectContaining({
           type: 'object',
-          properties: {
+          properties: expect.objectContaining({
             prompt: {
               type: 'string',
               description: 'The detailed natural language prompt for Claude to execute.',
@@ -58,9 +55,22 @@ describe('Claude Code MCP E2E Tests', () => {
               type: 'string',
               description: expect.stringContaining('working directory'),
             },
-          },
+            sessionId: expect.objectContaining({
+              type: 'string',
+            }),
+            messages: expect.objectContaining({
+              type: 'array',
+            }),
+            stateless: expect.objectContaining({
+              type: 'boolean',
+            }),
+            permissionMode: expect.objectContaining({
+              type: 'string',
+              enum: expect.arrayContaining(['bypassPermissions', 'default', 'plan']),
+            }),
+          }),
           required: ['prompt'],
-        },
+        }),
       });
     });
   });
