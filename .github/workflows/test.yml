@@ -29,6 +29,9 @@ jobs:
       
     - name: Run unit tests only
       run: npm run test:unit
+
+    - name: Verify package contents
+      run: npm run test:package
       
     - name: Run all tests with coverage
       run: npm run test:coverage
