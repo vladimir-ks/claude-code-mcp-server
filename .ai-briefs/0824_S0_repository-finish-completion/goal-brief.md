@@ -40,6 +40,15 @@ OUT:
 ## Blocked = Concluded
 Every criterion resolves PROVEN, FILED-BLOCKER or VOID. Before any blocker is accepted, invoke the same-name `resolving-blockers` skill, run its complete ladder, continue independent work and recheck. FILED-BLOCKER requires the pasted failure, named unavoidable external dependency, exact clearing action and three consecutive goal turns with unchanged fresh evidence. Difficulty, budget and disk pressure alone are not blockers.
 
+### BLOCKER — placement-authority
+
+- Status: FILED-BLOCKER candidate; first fresh goal-turn observation on 2026-08-24.
+- Failure: exact `rg` over `_pdaa/workspace.yaml`, the campaign goal/payload/relocation authority and the decisions ledger returned no `claude-code-mcp-server` placement mapping; the proposed `_dev_tools` target is absent but absence is not authorization.
+- Ladder: ground truth, troubleshooting KB, credential relevance, mint/self-hosted paths, standing grants and available interaction surfaces were checked in order. No source can create an authoritative fleet decision inside this repository task.
+- External dependency: fleet coordinator placement decision.
+- Exact clearing action: record the approved steward and exact collision-free operating-group destination for repository identity `vladimir-ks/claude-code-mcp-server`, then rerun the state-bound relocation rehearsal.
+- Independent repository quality, consumer accounting, preservation and cleanup continue; do not move on inference.
+
 ## Scope Verdict
 Tier L · approximately 25–45 turns · repository code/tests/docs plus bounded consumer and relocation artifacts. Verdict: oversized-single-goal; all remaining repository completion surfaces stay in one lineage.
 
